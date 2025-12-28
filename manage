@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+
+import typing
+from pathlib import Path
+import subprocess
+import shutil
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+import click
+
+
+def to_title_case(parts):
+    return "".join([part.capitalize() for part in parts])
+
+
+Cmd = typing.Literal["markdown", "build", "clean", "list"]
+
+
+class Album(typing.NamedTuple):
+    input_path: Path
+    name: str
+    title: str
+    out: str
+
+
+def build_album(album):
+    cmd = [
+        "sigal",
+        "build",
+        "--title",
+        album.title,
+        str(album.input_path),
+        album.out,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    return (album.name, result.stdout, result.stderr, result.returncode)
+
+
+@click.command()
+@click.argument("function", default="build", type=click.Choice(typing.get_args(Cmd)))
+def main(function: Cmd) -> None:
+    albums: list[Album] = []
+    # List all subdirectories in ./inputs (one level deep)
+    for album_path in sorted([p for p in Path("./inputs").iterdir() if p.is_dir()]):
+        album = album_path.name
+        name = album.replace("_", " ")[album.index("_") + 1 :]
+        parts = album.split("_")[1:]
+        out = "".join([p[0] for p in parts])
+        capitalized_title = to_title_case(parts)
+        albums.append(
+            Album(
+                input_path=album_path,
+                name=name,
+                title=capitalized_title,
+                out=out,
+            )
+        )
+
+    jobs = []
+    for album in albums:
+        match function:
+            case "markdown":
+                click.echo(f"- [{album.name}](./{album.out}/)")
+            case "build":
+                # save to build in parallel later
+                jobs.append(album)
+            case "clean":
+                if Path(album.out).exists():
+                    click.echo(f"Removing directory: {album.out}", err=True)
+                    shutil.rmtree(album.out)
+                else:
+                    click.echo(
+                        f"Directory does not exist, skipping: {album.out}", err=True
+                    )
+            case "list":
+                click.echo(album.out)
+            case _:
+                typing.assert_never(function)
+
+    if jobs:
+        with ProcessPoolExecutor() as executor:
+            future_to_album = {
+                executor.submit(build_album, album): album for album in jobs
+            }
+            for future in as_completed(future_to_album):
+                album = future_to_album[future]
+                name, stdout, stderr, returncode = future.result()
+                click.echo(f"\n=== {name} ===\n")
+                if stdout:
+                    click.echo(stdout.strip())
+                if stderr:
+                    click.echo(stderr.strip(), err=True)
+                if returncode != 0:
+                    click.echo(
+                        f"Build failed for {click.style(name, 'red')} (exit code {returncode})",
+                        err=True,
+                    )
+
+
+if __name__ == "__main__":
+    main()
