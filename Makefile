@@ -1,4 +1,5 @@
-all: fixes build index.html sync
+all_sync: all sync
+all: fixes build index.html
 sync_targets.txt: ./inputs ./index.html
 	./manage list | xargs echo inputs index.html | tr ' ' '\n' > ./sync_targets.txt
 page.md: ./manage ./inputs
