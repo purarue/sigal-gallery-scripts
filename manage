@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
+import os
 import typing
-from pathlib import Path
 import subprocess
-import shutil
+from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import click
@@ -13,7 +13,7 @@ def to_title_case(parts):
     return "".join([part.capitalize() for part in parts])
 
 
-Cmd = typing.Literal["markdown", "build", "clean", "list"]
+Cmd = typing.Literal["markdown", "build", "list"]
 
 
 class Album(typing.NamedTuple):
@@ -21,6 +21,7 @@ class Album(typing.NamedTuple):
     name: str
     title: str
     out: str
+    is_private: bool
 
 
 def build_album(album):
@@ -33,6 +34,7 @@ def build_album(album):
         album.out,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
+    (Path(album.out) / ".gitignore").write_text("*")
     return (album.name, result.stdout, result.stderr, result.returncode)
 
 
@@ -42,13 +44,20 @@ def main(function: Cmd) -> None:
     albums: list[Album] = []
     # List all subdirectories in ./inputs (one level deep)
     for album_path in sorted([p for p in Path("./inputs").iterdir() if p.is_dir()]):
+        is_private = (album_path / ".priv").exists()
         album = album_path.name
-        name = album.replace("_", " ")[album.index("_") + 1 :]
-        parts = album.split("_")[1:]
-        out = "".join([p[0] for p in parts])
-        capitalized_title = to_title_case(parts)
+        if is_private:
+            name = " ".join(album.split("_"))
+            out = os.path.join("gallery", album)
+            capitalized_title = name
+        else:
+            name = album.replace("_", " ")[album.index("_") + 1 :]
+            parts = album.split("_")[1:]
+            out = os.path.join("gallery", "".join([p[0] for p in parts]))
+            capitalized_title = to_title_case(parts)
         albums.append(
             Album(
+                is_private=is_private,
                 input_path=album_path,
                 name=name,
                 title=capitalized_title,
@@ -60,24 +69,19 @@ def main(function: Cmd) -> None:
     for album in albums:
         match function:
             case "markdown":
-                click.echo(f"- [{album.name}](./{album.out}/)")
+                if not album.is_private:
+                    click.echo(f"- [{album.name}](./{Path(album.out).name}/)")
             case "build":
                 # save to build in parallel later
                 jobs.append(album)
-            case "clean":
-                if Path(album.out).exists():
-                    click.echo(f"Removing directory: {album.out}", err=True)
-                    shutil.rmtree(album.out)
-                else:
-                    click.echo(
-                        f"Directory does not exist, skipping: {album.out}", err=True
-                    )
             case "list":
-                click.echo(album.out)
+                click.echo(Path(album.out).name)
             case _:
                 typing.assert_never(function)
 
     if jobs:
+        if not os.path.exists("gallery"):
+            os.mkdir("gallery")
         with ProcessPoolExecutor() as executor:
             future_to_album = {
                 executor.submit(build_album, album): album for album in jobs
