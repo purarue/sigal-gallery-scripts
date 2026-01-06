@@ -47,7 +47,7 @@ author = 'purarue'
 # ----------------
 
 # Size of resized image (default: (640, 480))
-img_size = (800, 600)
+img_size = (3200, 3000)
 
 # Max input image size in pixels (default: None, i.e. use PIL default)
 # This option sets `PIL.Image.MAX_IMAGE_PIXELS` in case you want to
@@ -74,7 +74,7 @@ img_size = (800, 600)
 # - ResizeToFill: crop THE IMAGE it to the exact specified width and height
 # - SmartResize: identical to ResizeToFill, but uses entropy to crop the image
 # - None: don't resize
-# img_processor = 'ResizeToFit'
+img_processor = 'ResizeToFit'
 
 # Autorotate images
 # Warning: this setting is not compatible with `copy_exif_data` (see below),
@@ -134,17 +134,17 @@ thumb_size = (280, 210)
 # thumb_video_black_max_colors = 4
 
 # Keep original image (default: False)
-keep_orig = True
+keep_orig = False
 
 # Subdirectory for original images
 orig_dir = 'input'
 
 # Use symbolic links instead of copying the original images
-orig_link = True
+orig_link = False
 
 # Use symbolic links that are relative to the source directory instead of
 # absolute paths
-rel_link = True
+rel_link = False
 
 # Attribute of Album objects which is used to sort medias (eg 'title'). To
 # sort on a metadata key, use 'meta.key'.
