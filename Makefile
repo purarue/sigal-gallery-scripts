@@ -12,7 +12,6 @@ fixes:
 	@# make sure permissions on images are readable by remote server
 	fd -i jpg inputs -x chmod +r
 sync:
-	retry -- rsync -Pavh --relative --links --delete-after gallery/ vultr:static_files/
-	retry -- rsync -Pavh --delete-after inputs vultr:static_files/
+	retry -- rsync -Pavh gallery/ vultr:static_files/gallery
 clean:
 	rm -rf gallery
