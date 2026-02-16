@@ -65,6 +65,14 @@ def main(function: Cmd) -> None:
             )
         )
 
+    seen: dict[str, str] = {}
+    for a in albums:
+        if a.out in seen:
+            raise click.Abort(
+                f"Found duplicate '{a.out}' '{a.name}' and '{seen[a.out]}'"
+            )
+        seen[a.out] = a.name
+
     jobs = []
     for album in albums:
         match function:
