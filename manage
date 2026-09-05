@@ -21,7 +21,7 @@ class Album(typing.NamedTuple):
     name: str
     title: str
     out: str
-    is_private: bool
+    public: bool
 
 
 def build_album(album):
@@ -44,9 +44,10 @@ def main(function: Cmd) -> None:
     albums: list[Album] = []
     # List all subdirectories in ./inputs (one level deep)
     for album_path in sorted([p for p in Path("./inputs").iterdir() if p.is_dir()]):
-        is_private = (album_path / ".priv").exists()
+        public = (album_path / ".public").exists()
         album = album_path.name
-        if is_private:
+        if not public:
+            # private album, don't modify url slug
             name = " ".join(album.split("_"))
             out = os.path.join("gallery", album)
             capitalized_title = name
@@ -57,7 +58,7 @@ def main(function: Cmd) -> None:
             capitalized_title = to_title_case(parts)
         albums.append(
             Album(
-                is_private=is_private,
+                public=public,
                 input_path=album_path,
                 name=name,
                 title=capitalized_title,
@@ -77,7 +78,7 @@ def main(function: Cmd) -> None:
     for album in albums:
         match function:
             case "markdown":
-                if not album.is_private:
+                if album.public:
                     click.echo(f"- [{album.name}](./{Path(album.out).name}/)")
             case "build":
                 # save to build in parallel later
@@ -94,8 +95,7 @@ def main(function: Cmd) -> None:
             future_to_album = {
                 executor.submit(build_album, album): album for album in jobs
             }
-            for future in as_completed(future_to_album):
-                album = future_to_album[future]
+            for future, album in as_completed(future_to_album).items():
                 name, stdout, stderr, returncode = future.result()
                 click.echo(f"\n=== {name} ===\n")
                 if stdout:
